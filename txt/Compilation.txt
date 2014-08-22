@@ -1,0 +1,217 @@
+Compilation
+===========
+
+:toc:
+
+Installing HTSlib or SAMtools 0.1.19
+------------------------------------
+
+Prior to late August 2014, HTSlib hadn't been released. It has now replaced the previous SAMtools C API and is preferred. As Bison pre-existed HTSlib's release, it supports both it and the older SAMtools 0.1.x API. For users preferring to not use HTSlib (for whatever reason), instructions for using the SAMtools 0.1.19 API are included.
+
+HTSlib installation
+~~~~~~~~~~~~~~~~~~~
+
+. Download http://www.htslib.org/download/[HTSlib]. You will only need the source code for HTSlib, not SAMtools as well.
+. Change to the download directory.
+. Using "htslib-1.0.tar.bz2" as an example of the file name, issue the following commands:
+
+-------------------------
+tar xf htslib-1.0.tar.bz2
+cd htslib-1.0
+pwd	<1>
+make
+-------------------------
+<1> Make note of the output as it's needed to compile Bison.
+
+You do not need to actually install HTSlib and can delete this directory after Bison is compiled.
+
+SAMtools 0.1.19 installation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Bison uses either the SAMtools or HTSlib C API for direct access to SAM/BAM files. Note that Bison versions prior to 0.3.2 lacked support for HTSlib, as HTSlib hadn't yet been released. If you prefer to use the pre-HTSlib version of SAMtools:
+
+. Download the samtools-0.1.19 source code from http://downloads.sourceforge.net/project/samtools/samtools/0.1.19/samtools-0.1.19.tar.bz2[SourceForge].
+. Change to the download directory.
+. Issue the following commands:
+
+------------------------------
+tar xf samtools-0.1.19.tar.bz2
+cd samtools-0.1.19
+pwd	<1>
+make
+------------------------------
+<1> Make note of this directory as it's needed to compile Bison.
+
+You do not need to actually install SAMtools. Only the headers and the file libbam.a are required for compiling and using Bison. After Bison has been compiled, you can delete this directory.
+
+MPI
+---
+
+There are a variety of sources of MPI libraries. If you have access to a cluster, an MPI implementation will already have been installed. Ask your local systems administrator for details. While setup and installation of MPI is beyond the scope of this document, it should be noted that Bison has been successfully used with the following:
+
+. http://www.open-mpi.org[OpenMPI]
+. http://mvapich.cse.ohio-state.edu/news/[MVAPICH2]
+. http://www.mpich.org[MPICH]
+
+It is likely that other libraries work as well.
+
+Regardless of the implementation you use it must support at least MPI_THREAD_FUNNELED to use Bison and MPI_THREAD_MULTIPLE to use `bison_herd`. The latter is often not enabled by default if you compile things manually. Both `bison` and `bison_herd` check for the needed level of support and will issue an error message and close if it's unmet.
+
+Bison
+-----
+
+To compile Bison, perfom the following:
+
+. Download a release version of the source code from http://sourceforge.net/projects/dna-bison/[Sourceforge].
+. Change to the download directory.
+. Assuming the file name is "bison-0.3.2.tgz", issue the following commands:
++
+----------------------
+tar xf bison-0.3.2.tgz
+cd bison-0.3.2
+----------------------
++
+. Edit the Makefile (see the next section for details)
+. On some clusters, you'll need to make MPI available (e.g., with `module load mpich`). Your local administrator can help you with this.
+. Type the following:
++
+------------------
+make		<1>
+make herd	<2>
+make auxiliary	<3>
+make install
+------------------
+<1> This compiles `bison` and other base executables.
+<2> Only needed if you want to use `bison_herd` as well.
+<3> This installs a variety of conversion and other helper programs that you may find useful.
+
+You can now delete the directory containing the source code and use Bison.
+
+Editting the Makefile
+~~~~~~~~~~~~~~~~~~~~~
+
+There are 7 lines at the top of the Makefile that may be editted. They begin with the following:
+
+. PREFIX
+. CC
+. HTSLIB
+. INCLUDE_DIRS
+. LIB_DIRS
+. OPTS
+. MPI
+
+An explanation of each line and how to set it follows.
+
+PREFIX
+^^^^^^
+
+This line specifies where the various Bison executables will be installed. On my workstation, I want things installed under bin/ in my home directory (/home/ryand), so this line would become:
+
+------------------
+PREFIX=/home/ryand/bin
+------------------
+
+On our local cluster, there's a different directory that's accessible across nodes. This happens to be a preset environment variable `$(WORK)` for us. So on our cluster, this line is instead:
+
+--------------
+PREFIX=$(WORK)/bin
+--------------
+
+When you issue the `make install` command to actually install things, the executables will be copied to the bin/ directory inside $PREFIX. It's advised to add this to your PATH if you haven't already done so.
+
+CC
+^^
+
+This line dictates what C compiler you want to use. This will normally be mpicc (the default). Thus, this line becomes:
+
+--------
+CC=mpicc
+--------
+
+HTSLIB
+^^^^^^
+
+This line determines which of the HTSlib API or the older samtools-0.1.x API is used. To use HTSlib (the default), simply set this to anything:
+
+-----------
+HTSLIB=true
+-----------
+
+If you would prefer to not use HTSLIB, simply leave this line unset:
+
+-------
+HTSLIB=
+-------
+
+Note that there is no space after the '=' sign.
+
+INCLUDE_DIRS and LIB_DIRS
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These line tells the compiler where to find header files and the linker where the libraries are located, respectively. Remember the notes from the "HTSlib Installation" and "SAMtools 0.1.19 Installation" sections to note a directory? That's used here.
+
+Let's suppose that we want to use the HTSlib API (the default) and that we compiled that in `/home/ryand/Downloads/htslib-1.0`. These lines would then be:
+
+---------------------------------------------
+INCLUDE_DIRS=-I/home/ryand/Downloads/htslib-1.0
+LIB_DIRS=-L/home/ryand/Downloads/htslib-1.0
+---------------------------------------------
+
+Note that the `-I` and `-L` portions are required, since these are compiler options. If your compiler doesn't know where to find standard libraries and headers (this is unlikely) then you can specify the locations manually, such as with this:
+
+---------------------------------------------
+INCLUDE_DIRS=-I/home/ryand/Downloads/htslib-1.0 -I/usr/include
+LIB_DIRS=-L/home/ryand/Downloads/htslib-1.0 -L/usr/lib
+---------------------------------------------
+
+If you happen to have HTSlib installed on your system, then it's likely that the following are more appropriate:
+
+---------------------------------------------
+INCLUDE_DIRS=-I/usr/local/include
+LIB_DIRS=-I/usr/local/lib
+---------------------------------------------
+
+Similarly, if we wanted to use the older SAMtools C API and compiled SAMtools in `/home/ryand/Downloads/samtools-0.1.19` then these lnes would be:
+
+---------------------------------------------
+INCLUDE_DIRS=-I/home/ryand/Downloads/samtools-0.1.19
+LIB_DIRS=-L/home/ryand/Downloads/samtools-0.1.19
+---------------------------------------------
+
+OPTS
+^^^^
+
+This line specifies compiler settings. It is highly unlikely that you need to modify the defaults (see your compiler's documentation if you're curious), which are:
+
+-----------------
+OPTS := -Wall -O3
+-----------------
+
+Note that the ':' before the equals sign is required.
+
+Aside from options specific to your compiler (see its manual), other options that you can add are `-DDEBUG` and `-DNOTHROTTLE`. Neither of these are recommended and both are described further in the README.md file that accompanies the Bison source code.
+
+MPI
+^^^
+
+Each MPI library produces a seemingly different library name.
+
+If your cluster is using OpenMPI, the following line should be appropriate:
+
+---------
+MPI=-lmpi
+---------
+
+For MPICH, this line should be:
+
+-----------------
+MPI=-lmpich -lmpl
+-----------------
+
+For MVAPICH2, this line can be unset:
+
+----
+MPI=
+----
+
+If these don't work or you're using a different MPI library, either ask you local systems administrator or http://seqanswers.com/forums/showthread.php?t=31314[here] for help.

@@ -1,0 +1,10 @@
+Requirements
+============
+
+Bison requires a number of other packages for usage. Since it's targeted toward users with access to a computer cluster, some of these will already typically be satisfied.
+
+- A functional MPI implementation. If you have access to a cluster, it'll already have this (ask your local systems administrator for details on the exact implementation). Installation of an MPI library is beyond the purview of this document.
+- Bowtie2, http://bowtie-bio.sourceforge.net/bowtie2/index.shtml[available here]. The bowtie2 executables must be in your PATH.
+- zcat, gzip, and bzcat must also be in your PATH (this is typically already done).
+- In order to use bison_mbias2pdf, you'll need R and the ggplot2 library. This isn't needed on your cluster and you can easily run it on any desktop or laptop computer. R can be obtained from the https://r-project.org[R website]. ggplot2 is available from CRAN http://cran.r-project.org/web/packages/ggplot2/index.html[here].
+- Finally, either SAMtools or HTSlib are required. See the Compilation.html["Compilation"] section for details.
