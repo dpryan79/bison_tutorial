@@ -1,0 +1,356 @@
+Usage
+=====
+
+bison vs. bison_herd
+--------------------
+
+The Bison package comes with two related aligners, `bison` and `bison_herd`. Both produce the same results but have slightly different capabilities and requirements. `bison` requires exactly 3 or 5 allocated nodes for operation, depending on whether --directional is used or not. While `bison_herd` can use the same number of nodes, it can also use more (e.g., 9, or 11, or any other odd number). `bison` produces temporary compressed fastq files, requiring significantly more disk space. `bison_herd`, on the other hand, does not require large temporary files. However, `bison_herd` is more demanding of your MPI implmentation and isn't gauranteed to be supported if you're using a cluster with an older MPI implementation. `bison` should always be supported by a cluster. Finally, `bison` can only align a single fastq file (or pair of them) at a time, while `bison_herd` can process a list and use file globbing (this is described below).
+
+In the examples that follow, we will use both `bison` and `bison_herd`. Except when explicitly noted, one can be directly substituted for the other.
+
+Preprocessing
+-------------
+
+User's should adapter and quality trim reads prior to alignment. The simplest way to do this is with http://www.bioinformatics.babraham.ac.uk/projects/trim_galore/[Trim Galore!]. The examples in this tutorial do not require trimming, but real data will.
+
+For a paired-end data, a good example command would be:
+`trim_galore -q 5 --fastqc --gzip --paired file_1.fastq.gz file_2.fastq.gz`
+
+Note that since Bison's methylation extractor can ignore poor quality bases, there's no need to trim too aggresively.
+
+Alignment
+---------
+
+These examples show some of the general features of Bison, but not everything. For a full list of options to both `bison` and `bison_herd`, simply type `bison -h` or `bison_herd -h`. This applies to all programs that come with the Bison package.
+
+IMPORTANT: Some systems already have a program called "bison" installed. Rather than being an aligner, this is a parser generator from the https://www.gnu.org/software/bison/[GNU project]. For this reason, you may need to specify the full path to `bison`. This is done in all of the examples here, where "$PREFIX" represents the same directory you used in the Makefile when building Bison.
+
+Typical Usage
+~~~~~~~~~~~~~
+
+This tutorial comes with two small reference genomes and 3 sets of reads. Most of the examples don't actually require a cluster, so I'll be manually using `mpiexec` in them.
+
+WARNING: Every cluster is different. Consult you local system administrator on how to properly start parallel jobs on your cluster. Not doing this is a good way to get your access revoked!
+
+NOTE: The `mpiexec` command comes with each MPI library, but its options can differ between them. Please read `man mpiexec` if you run into problems.
+
+NOTE: It's assumed that you have a basic familiarity with command line usage and have already installed the Bison package.
+
+Building indices
+^^^^^^^^^^^^^^^^
+
+Change directories so you're in the bison_tutorial directory.
+
+We'll start with a small simulated dataset from E.Coli. This genome is quite small and there are only 100,000 reads, so this won't take long to run. The genome is located under "genomes/E.Coli". To index it, we'll simply run:
+
+`bison_index genomes/E.Coli`
+
+This step doesn't require MPI an will only take a few seconds to complete. You'll notice that a lot of text is printed to the screen. Much of this can be suppressed by instead running:
+
+`bison_index -q genomes/E.Coli`
+
+Since `bison_index` is just a wrapper around `bowtie2-build`, any of bowtie2-build's options can be used (except `-c`). However, you're unlikely to ever need any option other than `-q`, but run `bowtie2-build -h` if you want a full list of options.
+
+Aligning
+^^^^^^^^
+
+Now that we've indexed the E.Coli genome, we can align reads to it. These are located in the "reads/" directory. Both the 100_* and 50_* datasets are simulated paired-end datasets from directional libraries and differ only in read length (being 100 and 50bp, respectively). We'll start with the 100bp dataset.
+
+To align the 100bp dataset, run:
+
+`mpiexec -n 3 $PREFIX/bin/bison --directional -g genomes/E.Coli -1 reads/100_1.fq.gz -2 reads/100_2.fq.gz`
+
+The `mpiexec -n 3` portion of the command is required because I'm running this on my workstation. If you're running this on a cluster, this portion will likely be different. On my system, `-n 3` requests three copies of `bison` be run. This is needed because we specified `--directional`, which needs three running copies of `bison`. You'll notice that 2 files are created in the "reads/" directory, a BAM file ("100_1.bam") containing the alignments and a text file ("100_1.txt") that contains summary statistics. The contents of the text file are also printed to the screen. You'll likey see something like the following eventually printed to the screen:
+
+-----------------------------------------------------------------------------------
+Alignment:
+        100000 total paired-end reads analysed
+        89173 paired-end reads mapped ( 89.17%).
+
+Number of hits aligning to each of the orientations: <1>
+        44744    44.74% OT (original top strand)
+        44429    44.43% OB (original bottom strand)
+
+Cytosine Methylation (N.B., statistics from overlapping mates are added together!): <2>
+        Number of C's in a CpG context: 1337923
+        Percentage of methylated C's in a CpG context:  79.79%
+        Number of C's in a CHG context: 1139715
+        Percentage of methylated C's in a CHG context:   1.28%
+        Number of C's in a CHH context: 2047016
+        Percentage of methylated C's in a CHH context:   1.30%
+-----------------------------------------------------------------------------------
+<1> We normally expect reads to align close to equally to both strands. Note that the percentages refer to the total number of reads input, not just those mapped.
+<2> This dataset was simulated to have 80% CpG methyation and 1% non-CpG methylation, so this looks about right.
+
+One common issue is that you're unsure whether a given library is directional or not. It's easy to test this with a command like the following:
+
+`mpiexec -n 5 $PREFIX/bin/bison -upto 10000 -g genomes/E.Coli -1 reads/100_1.fq.gz -2 reads/100_2.fq.gz`
+
+The `-upto 10000` specifies to use just the first 10,000 reads. Note that we didn't specify a directional library and that we're running 5 processes (if you don't do this, you'll get an informative error). This will over-write the previous files and you'll get something like the following printed to the screen (and the text file):
+
+-----------------------------------------------------------------------------------
+Alignment:
+        10000 total paired-end reads analysed
+        8908 paired-end reads mapped ( 89.08%).
+
+Number of hits aligning to each of the orientations:
+        4564     45.64% OT (original top strand)
+        4344     43.44% OB (original bottom strand)
+        0         0.00% CTOT (complementary to the original top strand) <1>
+        0         0.00% CTOB (complementary to the original bottom strand)
+
+Cytosine Methylation (N.B., statistics from overlapping mates are added together!):
+        Number of C's in a CpG context: 134114
+        Percentage of methylated C's in a CpG context:  79.95%
+        Number of C's in a CHG context: 114167
+        Percentage of methylated C's in a CHG context:   1.29%
+        Number of C's in a CHH context: 204417
+        Percentage of methylated C's in a CHH context:   1.29%
+-----------------------------------------------------------------------------------
+<1> This and the next line only appear if you don't specify `--directional`.
+
+Note that neither of the complementary strand have alignments. This is indicative of a directional library. In a real dataset, you may get a few percent mapping to the complementary strands even if you have directional reads. If less than ~10% of the mapped reads align to each of the complementary strands then you likely have a directional dataset.
+
+Bison defaults to placing its output in the same directory as its input. This is often not desired, so you can use the `-o` option to change that:
+
+`mpiexec -n 3 $PREFIX/bin/bison --directional -o . -g genomes/E.Coli -1 reads/100_1.fq.gz -2 reads/100_2.fq.gz`
+
+You'll note that the output is placed in the current working directory.
+
+NOTE: Bison won't create directories for you!
+
+At the moment, we're using a lot of default settings. For example, bowtie2 is only using a single thread. On most clusters (and modern computers) you'll have access to multiple threads. Bowtie2 can accept a `-p` option to tell it how many threads to use. On my workstation, I have 12 cores, so I'll have each instance of bowtie2 use 5 threads (since there are 3 instances of `bison` being run, two of those will be using `bowtie2` and the other will be collating results).
+
+`mpiexec -n 3 $PREFIX/bin/bison --directional -o . -p 5 -g genomes/E.Coli -1 reads/100_1.fq.gz -2 reads/100_2.fq.gz`
+
+That runs a little faster. With a larger dataset, you'd see a more dramatic difference. In a real situation where each copy of `bison` is being run on its own node, it's best to try using one less than the total number of available cores, since the bison program itself will need one. So on our cluster with 12 core nodes I use `-p 11`.
+
+`bison` and `bison_herd` can accept pretty much any bowtie2 option. This is particularly useful if you'd like to use a preset, such as `--very-sensitive`:
+
+`mpiexec -n 3 $PREFIX/bin/bison --directional --very-sensitive -o . -p 5 -g genomes/E.Coli -1 reads/100_1.fq.gz -2 reads/100_2.fq.gz`
+
+In this case there's little difference in the result. For a full list of bowtie2 options, simply type `bowtie2 -h`, or consult the http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml[online manual].
+
+Single-end datasets
++++++++++++++++++++
+
+Sometimes you'll have a single-end dataset. We can align the 100bp paired-end dataset as if it were single-ended:
+
+`mpiexec -n 3 $PREFIX/bin/bison --directional -o . -g genomes/E.Coli -U reads/100_1.fq.gz`
+
+You can also run the following, which is equivalent:
+
+`mpiexec -n 3 $PREFIX/bin/bison --directional -o . -g genomes/E.Coli -1 reads/100_1.fq.gz`
+
+Aligning multiple datasets at once
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+One of the benefits to `bison_herd` over `bison` is that it can align more than one dataset at a time. There are two ways to do this and we'll go over both ways.
+
+One method is to simply separate each filenames by a comma. For example, if we run the following command, we'll align both the 100bp and 50bp datasets with one command.
+
+`mpiexec -n 3 $PREFIX/bin/bison_herd --directional -o . -p 5 -g genomes/E.Coli -1 reads/50_1.fq.gz,reads/100_1.fq.gz -2 reads/50_2.fq.gz,reads/100_2.fq.gz`
+
+NOTE: There's no space before or after the commas!
+
+The datasets will be written to different files, so you can use this method to align multiple datasets without intermingling them.
+
+While this method works, it can get a bit cumbersome if you have a long list of files. In that case, file globbing like that used on the command line comes in handy. Using this method, we can shorten the command above to:
+
+`mpiexec -n 3 $PREFIX/bin/bison_herd --directional -o . -p 5 -g genomes/E.Coli -1 "reads/*0_1.fq.gz" -2 "reads/*0_2.fq.gz"`
+
+IMPORTANT: Wild-cards need to be placed inside quotes. If you don't do that, your shell will expand these itself. If you ever get a warning about an unrecognized option and one of your files is mentioned as the option, then that's what happened.
+
+NOTE: Wondering why we used "reads/*0_1.fq.gz" instead of just "reads/*_1.fq.gz"? Because the latter would align "sample_1.fq.gz" and "sample_2.fq.gz" too, and those are human datasets.
+
+NOTE: Some MPI libraries won't allow you to run this on a single computer. You might have luck with `-N 3` instead of `-n 3` in such cases. If you're doing this on a cluster then this shouldn't be an issue.
+
+This method makes it very simple to align an arbitrary number of samples with a single command. If you have multiple groups of samples in different directories then you can combine both of the aforementioned methods (e.g. using `-1 "group1/*_1.fq.gz","group2/*_1.fq.gz"`).
+
+WARNING: Make sure your samples have different names. If you have "sample1" in both the "group1" and "group2" directories, then the group1 results will get over-written!
+
+NOTE: You can't mix single and paired-end samples with either of these methods.
+
+Local alignment
+^^^^^^^^^^^^^^^
+
+By default, Bison uses end-to-end alignment. There are some cases where you might absolutely need (or simply want) to use local alignment instead. This tutorial includes an example small human dataset that absolutely requires local alignment. The "reads/sample_1.fq.gz" and "reads/sample_2.fq.gz" files are from a targeted bisulfite sequencing dataset. In this case, the reads target a portion of the human Ahrr gene. The targeting isn't perfect and the group that generated this dataset was only interested in a specific portion of Ahrr, so we're only aligning to that portion. Since most of the reads are generated from fragments only partly overlapping the reference region, we need to use local alignment.
+
+We'll start by indexing the reference Ahrr seqeunce:
+
+`bison_index -q genomes/Human`
+
+This is a very short sequence, so this should only take a second or two. We can then align the reads using local alignment:
+
+`mpiexec -n 5 $PREFIX/bin/bison --local -o . -g genomes/Human -1 reads/sample_1.fq.gz -2 reads/sample_2.fq.gz`
+
+NOTE: This is a non-directional dataset.
+
+Had we not specified --local, almost nothing would have aligned (try it). Note that only the top and complementary to the top strand have alignments. This is pretty common for targeted bisulphite sequencing datasets, due to how the targeting works.
+
+When using local alignment, bowtie2's default settings are often not ideal. For that reason, you're advised to use the `--very-sensitive-local` preset:
+
+`mpiexec -n 5 $PREFIX/bin/bison --very-sensitive-local -o . -g genomes/Human -1 reads/sample_1.fq.gz -2 reads/sample_2.fq.gz`
+
+A short cluster example
+^^^^^^^^^^^^^^^^^^^^^^^
+
+On most clusters you'll end up using a scheduler (e.g., LSF, PBS or Slurm) to actually run bison. On our cluster we use Slurm and schedule jobs with the `sbatch` command.
+
+.A short example file for Slurm's `sbatch` command
+---------------------------------------------------------------------
+#!/bin/bash
+#SBATCH -J bison
+#SBATCH -t 01:00:00
+#SBATCH -N 9
+#SBATCH -A ryand
+#SBATCH --exclusive
+#SBATCH --partition=work
+BIN=$WORK/bin
+srun $BIN/bison_herd -@ 4 --directional -p 11 -o $WORK/Alignments -g $WORK/indexes/ -1 "$WORK/Sequences/SR*_1*.gz" -2 "$WORK/Sequences/SR*_2*.gz"
+---------------------------------------------------------------------
+
+The exact details of how to do this will vary according to your cluster, so contact your local systems administrator for help doing this the first time (it'd be impossible to provide examples appropriate for all clusters).
+
+Marking duplicates
+------------------
+
+When you align WGBS datasets, you'll want to mark duplicates on the resulting files. Neither of the simulated WGBS datasets included in this tutorial have considerable duplication, but will use one anyway.
+
+To mark duplicates, we use `bison_markduplicates`:
+
+`bison_markduplicates 50_1.bam 50_1.dedup.bam`
+
+We've now created a new BAM file ("50_1.dedup.bam")  with duplicates marked by modifying the alignment FLAG field (see the SAM specification for details). In this dataset there are very few marked duplicates (I got 2, different settings and/or versions of bowtie2 might produce different results). Both the methylation extractor and the methylation bias calculator will ignore duplicates.
+
+Methylation Bias
+----------------
+
+Bison's `bison_mbias` program is able to gather metrics needed to determine if you need to account for methylation bias when you actually extract the methylation metrics into bedGraph files. None of the datasets in this tutorial have methylation bias. To determine the methylation bias of the deduplicated 50bp dataset from above, we'll execute:
+
+`bison_mbias 50_1.dedup.bam`
+
+This produces a file called "50_1_mbias.txt". If you have R and ggplot2 installed on your computer, you can instead run:
+
+`bison_mbias -pdf 50_1.dedup.bam`
+
+This will also produce a PDF with diagnostic plots. If you don't have R on your computer, transfer 50_1_mbias.txt to a computer with R and ggplot2 and execute:
+
+`bison_mbias2pdf 50_1_mbias.txt`
+
+The actual PDF produced from this dataset isn't very useful for educational purposes, so I've included some graphs that do show methylation bias:
+
+image:OT.png[OT strand]
+image:OB.png[OB strand]
+image:CTOT.png[CTOT strand]
+image:CTOB.png[CTOB strand]
+
+NOTE: The shaded areas around each line are the confidence intervals.
+
+These were from a non-directional RRBS dataset, so there's a different image for each of the 4 strands. Note how the methylation percentage in these images dips down drastically near the 5' and 3' ends. Since this is an RRBS dataset, much of this bias is due to how the libraries were made. If we included all of the data when we extract methylation metrics, we'd end up decreasing the accuracy of our results. The vertical lines represent the recommended bounds for inclusion, beyond which apparent bias is observed. Note that the algorithm that produces these recommendations isn't perfect, so don't accept these blindly.
+
+Looking only at the OT strand results, we can see that the first 3 and last 2 bases of read #1 and the last 4 bases of read #2 show bias. When these images are created, the recommended options for methylation extraction are printed to the screen (if there's methylation bias observed). For this dataset, the following was printed to screen, "-OT 6,44,0,42 -OB 3,41,4,0 -CTOT 0,42,6,44 -CTOB 7,0,3,41". The format for these options are "-OT A,B,C,D", where A is the 5' bound for read #1, B is the 3' bound for read #1, C is the 5' bound for read #2 and D is the 3' bound for read #2. Note that a 0 in any position means "none", so "-OB 3,41,4,0" results in no cutoff on the 3' end of read #2. Since the recommended 5' cutoff for read #1 looks wrong, we can use "-OT 4,44,0,42" instead of "-OT 6,44,0,42" when we actually extract methylation. We can do the same for the other strands. In the end, the following settings are likely better for subsequent methylation extraction: "-OT 4,44,0,42 -OB 3,43,3,0 -CTOT 0,42,4,44 -CTOB 3,0,3,43".
+
+Methylation Extraction
+----------------------
+
+Once you've looked at methylation bias, you'll need to extract the final methylation metrics. This is done with the `bison_methylation_extractor` program. Aside from the methylation bias options described in the preceding section, other important options are whether you want to output only CpG or also CHG and/or CHH metrics (CpG metrics are output by default, though this can be disabled with the `-no_CpG` option.
+
+Let's extract methylation from the locally aligned human dataset, "sample_1.bam", that we created earlier.
+
+`bison_methylation_extractor genomes/Human sample_1.bam`
+
+You'll see that a new file called "sample_1_CpG.bedGraph" is created in the current working directory.
+
+.An excerpt of a bedGraph file
+-------------------------------------------------------------
+track type=bedGraph <1>
+AHRR:73933-74184        25      26 <2>     820 <3>   16662 <4>  3648 <5>
+AHRR:73933-74184        27      28      795     16148   4156
+AHRR:73933-74184        76      77      542     17532   14795
+-------------------------------------------------------------
+<1> The track definition line.
+<2> The first 3 columns have position information.
+<3> 1000 times the methylation percentage.
+<4> The number of reads aligning across this position showing methylation.
+<5> The number of reads aligning across this position showing unmethylation.
+
+For some experiments, especially those on plants, you may be interested in CHG and CHH metrics. To look at those here, we'd instead type:
+
+`bison_methylation_extractor -CHG -CHH genomes/Human sample_1.bam`
+
+There are now three bedGraph files, one each for CpG, CHG, and CHH context. These files are often sufficient for importing into R for statistical analysis.
+
+Auxiliary programs
+------------------
+
+NOTE: These will only exist if you typed `make auxiliary` before `make install`.
+
+Bison comes with a number of auxiliary programs to make your life easier. Many of these programs aid in importing data for specific R packages:
+
+. bedGraph2BSseq.py
+. bedGraph2methylKit
+. bedGraph2MethylSeekR.py
+. bedGraph2MOABS
+
+These programs and how to use them to import data into R are described in the README.md file that accompanies the Bison source code.
+
+We'll try the remaining auxiliary programs next.
+
+bison_merge_CpGs
+~~~~~~~~~~~~~~~~
+
+When bedGraphs are created by `bison_methylation_extractor`, each line describes a single cytosine. It's often convenient to combine both C's in a CpG into one metric. For that, we can use `bison_merge_CpGs´
+
+Using the 100bp E.Coli dataset as an example, we can execute:
+
+`bison_methylation_extractor genomes/E.Coli/ 100_1.bam`
+`bison_merge_CpGs genomes/E.Coli/ 100_1_CpG.bedGraph`
+
+Note that two new bedGraph files were created. The first, "100_1_CpG.bedGraph", was the original file made by `bison_methylation_extractor`. The second file, "100_1_CpG.merged.bedGraph", contains CpG-level metrics. For convenience, `bison_merge_CpGs` can take a space-separated list of files, so commands like `bison_merge_CpGs genome/ *.bedGraph` are possible.
+
+merge_bedGraphs.py
+~~~~~~~~~~~~~~~~~~
+
+Particularly with WGBS datasets, you may need to sequence individual samples multiple times to get sufficient coverage. In doing so, you might end up processing the individual runs separately and then have multiple bedGraph files for a given sample that you'd like to merge together. For such cases, we provide the `merge_bedGraphs.py` python program.
+
+If we wanted to merge two bedGraph files names "sample1_run1.bedGraph" and "sample1_run2.bedGraph" together into a single "sample1.bedGraph" file, we could do use the following command:
+
+`merge_bedGraphs.py sample1.bedGraph sample1_run1.bedGraph sample1_run2.bedGraph`
+
+merge_bedGraphs.py can merge together any number of bedGraph files in a single go, don't worry that you need to run it multiple times per sample.
+
+bison_CpG_coverage
+~~~~~~~~~~~~~~~~~~
+
+A common question is what sort of CpG coverage your dataset has. To answer that question, we can use `bison_CpG_coverage`. Let's use this on the 100_1_CpG.bedGraph file:
+
+`bison_CpG_coverage genomes/E.Coli/ 100_1_CpG.bedGraph coverage.txt`
+
+.Excerpt of coverage.txt
+----------------------------
+0<1>      23394<2>
+1       42756
+2       70142
+3       77070
+4       63263
+5       41898
+6       22676
+7       10737
+8       4490
+----------------------------
+<1> Coverage
+<2> Number of CpGs with a given coverage.
+
+Looking at the excerpt, we can see that 23394 CpG were completely uncovered, 42756 were covered once, 70142 were covered twice and so on. The output file ends in "251+", since everything covered more than 251 times is put into a single bin. If you have an RRBS data you can't mark duplicates, but you can look at the coverage distribution to see if there are any CpGs that should be ignored. You can use either a single-C resolution or merged CpG bedGraph file as input (they'll give the same output).
+
+make_reduced_genome
+~~~~~~~~~~~~~~~~~~~
+
+NOTE: I recommend aligning RRBS datasets to the whole genome, but I know others prefer to align to a specicial RRBS genome like this.
+
+When dealing with RRBS datasets, it's sometimes convenient to preprocess a reference genome to hard-mask regions unlikely to be sequenced (i.e., regions too far from a restriction enzyme binding site). `make_reduce_genome` can perform such preprocessing for TaqI and MspI digested libraries. The resulting genome can be customized for alignment with a given read length. Suppose that the 50bp E.Coli dataset that we used earlier in this tutorial were really an RRBS dataset. Then we might preprocess the reference genome with:
+
+`make_reduced_genome -n 50 genomes/E.Coli/Escherichia_coli.GCA_000597845.1.23.dna.genome.fa masked.fa`
+
+This creates a hard-masked fasta file, "masked.fa", in the current directory. Have a look in this file if you're unfamiliar with hard-masking. We could then index and align against this file. While aligning against such a hard-masked genome is faster, it's also slightly biased because the selection isn't perfect. Me mindful of this critique if you do this.
