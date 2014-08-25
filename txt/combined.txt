@@ -1,0 +1,15 @@
+BISON: BISulfite alignment On Nodes of a cluster
+================================================
+
+Welcome to the Bison tutorial. In this short tutorial I hope to walk you through how to successfully install and use the various programs in the Bison package. This tutorial comes with 3 example datasets, two simulated E.Coli whole-genome bisulfite sequencing datasets generated with http://www.bioinformatics.babraham.ac.uk/projects/sherman/[Sherman] and a small human targeted bisulfite sequencing data generously provided by Meeshanthini Dogan in Prof. Robert Philibert's lab at the University of Iowa.
+
+//otherwise the chapter titles get their own pages
+:leveloffset: 1
+
+include::Introduction.txt[]
+
+include::Requirements.txt[]
+
+include::Compilation.txt[]
+
+include::Usage.txt[]
