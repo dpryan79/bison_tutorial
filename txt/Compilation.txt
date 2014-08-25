@@ -215,3 +215,4 @@ MPI=
 ----
 
 If these don't work or you're using a different MPI library, either ask you local systems administrator or http://seqanswers.com/forums/showthread.php?t=31314[here] for help.
+

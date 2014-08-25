@@ -354,3 +354,4 @@ When dealing with RRBS datasets, it's sometimes convenient to preprocess a refer
 `make_reduced_genome -n 50 genomes/E.Coli/Escherichia_coli.GCA_000597845.1.23.dna.genome.fa masked.fa`
 
 This creates a hard-masked fasta file, "masked.fa", in the current directory. Have a look in this file if you're unfamiliar with hard-masking. We could then index and align against this file. While aligning against such a hard-masked genome is faster, it's also slightly biased because the selection isn't perfect. Me mindful of this critique if you do this.
+

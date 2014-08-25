@@ -8,3 +8,4 @@ Bison requires a number of other packages for usage. Since it's targeted toward 
 - zcat, gzip, and bzcat must also be in your PATH (this is typically already done).
 - In order to use bison_mbias2pdf, you'll need R and the ggplot2 library. This isn't needed on your cluster and you can easily run it on any desktop or laptop computer. R can be obtained from the https://r-project.org[R website]. ggplot2 is available from CRAN http://cran.r-project.org/web/packages/ggplot2/index.html[here].
 - Finally, either SAMtools or HTSlib are required. See the Compilation.html["Compilation"] section for details.
+
