@@ -105,10 +105,10 @@ An explanation of each line and how to set it follows.
 PREFIX
 ^^^^^^
 
-This line specifies where the various Bison executables will be installed. On my workstation, I want things installed under bin/ in my home directory (/home/ryand), so this line would become:
+This line specifies where the various Bison executables will be installed. On my workstation, I want things installed under bin/ in my home directory (/home/my_user), so this line would become:
 
 ------------------
-PREFIX=/home/ryand/bin
+PREFIX=/home/my_user/bin
 ------------------
 
 On our local cluster, there's a different directory that's accessible across nodes. This happens to be a preset environment variable `$(WORK)` for us. So on our cluster, this line is instead:
@@ -131,13 +131,7 @@ CC=mpicc
 HTSLIB
 ^^^^^^
 
-This line determines which of the HTSlib API or the older samtools-0.1.x API is used. To use HTSlib (the default), simply set this to anything:
-
------------
-HTSLIB=true
------------
-
-If you would prefer to not use HTSLIB, simply leave this line unset:
+This line determines which of the HTSlib API or the older samtools-0.1.x API is used. If you wish to use the older samtools API, simply leave this line unset:
 
 -------
 HTSLIB=
@@ -145,38 +139,48 @@ HTSLIB=
 
 Note that there is no space after the '=' sign.
 
+Presuming that you want to use the newer HTSlib API, you'll need to alter this line to include the full path to libhts.a. Remember the notes from the "HTSlib Installation" above to note a directory? That's used here. Suppose that the directory you noted earlier was "/home/my_user/htslib-1.0", then you simply need to append "/libhts.a" to that:
+
+-----------
+HTSLIB = /home/my_user/htslib-1.0/libhts.a
+-----------
+
+When HTSLIB is set like this, you're unlikely to then need to set LIB_DIRS to anything (though doing so won't hurt anything).
+
 INCLUDE_DIRS and LIB_DIRS
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 These line tells the compiler where to find header files and the linker where the libraries are located, respectively. Remember the notes from the "HTSlib Installation" and "SAMtools 0.1.19 Installation" sections to note a directory? That's used here.
 
-Let's suppose that we want to use the HTSlib API (the default) and that we compiled that in `/home/ryand/Downloads/htslib-1.0`. These lines would then be:
+Let's suppose that we want to use the HTSlib API and that we compiled that in `/home/my_user/htslib-1.0`. These lines would then be:
 
 ---------------------------------------------
-INCLUDE_DIRS=-I/home/ryand/Downloads/htslib-1.0
-LIB_DIRS=-L/home/ryand/Downloads/htslib-1.0
+INCLUDE_DIRS=-I/home/my_user/htslib-1.0
+LIB_DIRS=
 ---------------------------------------------
 
 Note that the `-I` and `-L` portions are required, since these are compiler options. If your compiler doesn't know where to find standard libraries and headers (this is unlikely) then you can specify the locations manually, such as with this:
 
 ---------------------------------------------
-INCLUDE_DIRS=-I/home/ryand/Downloads/htslib-1.0 -I/usr/include
-LIB_DIRS=-L/home/ryand/Downloads/htslib-1.0 -L/usr/lib
+INCLUDE_DIRS=-I/home/my_user/htslib-1.0 -I/usr/include
+LIB_DIRS=-L/usr/lib
 ---------------------------------------------
 
 If you happen to have HTSlib installed on your system, then it's likely that the following are more appropriate:
 
 ---------------------------------------------
 INCLUDE_DIRS=-I/usr/local/include
-LIB_DIRS=-I/usr/local/lib
+LIB_DIRS=
 ---------------------------------------------
 
-Similarly, if we wanted to use the older SAMtools C API and compiled SAMtools in `/home/ryand/Downloads/samtools-0.1.19` then these lnes would be:
+Similarly, if we wanted to use the older SAMtools C API and compiled SAMtools in `/home/my_user/samtools-0.1.19` then these lnes would be:
 
 ---------------------------------------------
-INCLUDE_DIRS=-I/home/ryand/Downloads/samtools-0.1.19
-LIB_DIRS=-L/home/ryand/Downloads/samtools-0.1.19
+INCLUDE_DIRS=-I/home/my_user/samtools-0.1.19
+LIB_DIRS=-L/home/my_user/samtools-0.1.19
 ---------------------------------------------
+
+NOTE: Wondering why you have to specify LIB_DIRS for the older but not the newer API? This is because HTSlib creates both shared and static libraries, while the older API only has a static API. To keep things simple in the Makefile, I compile things in statically in both cases. Treating things in this way allows for a simpler Makefile.
 
 OPTS
 ^^^^
