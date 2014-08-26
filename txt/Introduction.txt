@@ -7,7 +7,7 @@ provides instructions for installation as well as usage using a number of
 example datasets that accompany this document.
 
 The version of the tutorial that you're reading has been produced for version
-0.3.2 of BISON.
+0.3.2b of BISON.
 
 If you have questions not covered by this document or notice errors, please feel
 free to post a message http://seqanswers.com/forums/showthread.php?t=31314[here].

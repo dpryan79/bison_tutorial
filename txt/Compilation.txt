@@ -64,11 +64,11 @@ To compile Bison, perfom the following:
 
 . Download a release version of the source code from http://sourceforge.net/projects/dna-bison/[Sourceforge].
 . Change to the download directory.
-. Assuming the file name is "bison-0.3.2.tgz", issue the following commands:
+. Assuming the file name is "bison-0.3.2b.tgz", issue the following commands:
 +
 ----------------------
-tar xf bison-0.3.2.tgz
-cd bison-0.3.2
+tar xf bison-0.3.2b.tgz
+cd bison
 ----------------------
 +
 . Edit the Makefile (see the next section for details)
