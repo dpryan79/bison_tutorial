@@ -192,6 +192,15 @@ When using local alignment, bowtie2's default settings are often not ideal. For 
 
 `mpiexec -n 5 $PREFIX/bin/bison --very-sensitive-local -o . -g genomes/Human -1 reads/sample_1.fq.gz -2 reads/sample_2.fq.gz`
 
+Discordant and singleton alignments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+As of version 0.3.3, bison supports producing discordant and singleton alignments by default. A discordant alignment occurs when a pair of reads align with either a non-default orientation (e.g. head to tail) or with an unexpected insert size (e.g., 5kb, when the expected maximum is 500bp). Singleton alignments occur when either only one mate in a pair aligns or when the mates only align singly (e.g., read#1 aligns to chr1 and read#2 aligns to chr7). In previous versions, such alignments were suppressed but are now included by default. In practice, these types of alignments make up a small percentage of the resulting alignments. If you would like to continue suppressing these alignments (they are slightly more likely to be incorrect alignments), you can use the following:
+
+`mpiexec -n 3 $PREFIX/bin/bison --directional --no-discordant --no-mixed -o . -p 5 -g genomes/E.Coli -1 reads/100_1.fq.gz -2 reads/100_2.fq.gz`
+
+The `--no-discordant` option is sufficient to disable discordant, but not singleton alignments. The `--no-mixed` option will suppress singleton, but not discordant alignments.
+
 A short cluster example
 ^^^^^^^^^^^^^^^^^^^^^^^
 
